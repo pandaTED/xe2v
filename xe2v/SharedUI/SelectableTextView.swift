@@ -27,6 +27,14 @@ struct SelectableTextView: UIViewRepresentable {
 
     func updateUIView(_ uiView: Base64SelectableTextView, context: Context) {
         uiView.attributedText = attributedText
+        uiView.invalidateIntrinsicContentSize()
+    }
+
+    func sizeThatFits(_ proposal: ProposedViewSize, uiView: Base64SelectableTextView, context: Context) -> CGSize? {
+        let fallbackWidth = uiView.window?.windowScene?.screen.bounds.width ?? 375
+        let width = proposal.width ?? fallbackWidth - 32
+        let fit = uiView.sizeThatFits(CGSize(width: width, height: .greatestFiniteMagnitude))
+        return CGSize(width: width, height: ceil(fit.height))
     }
 
     final class Coordinator: NSObject, UITextViewDelegate {
@@ -41,15 +49,6 @@ struct SelectableTextView: UIViewRepresentable {
 }
 
 final class Base64SelectableTextView: UITextView {
-    override var intrinsicContentSize: CGSize {
-        CGSize(width: UIView.noIntrinsicMetric, height: contentSize.height)
-    }
-
-    override func layoutSubviews() {
-        super.layoutSubviews()
-        invalidateIntrinsicContentSize()
-    }
-
     func decodeSelectedBase64AndCopy(range: NSRange) {
         let selected = (text as NSString).substring(with: range)
         guard let output = selected.decodedBase64String else { return }

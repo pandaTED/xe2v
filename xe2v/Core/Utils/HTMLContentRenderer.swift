@@ -5,9 +5,19 @@ struct HTMLContentRenderer {
     static func plainText(from html: String?) -> String {
         guard let html, !html.isEmpty else { return "" }
         return html
-            .replacingOccurrences(of: "<br>", with: "\n")
-            .replacingOccurrences(of: "<br/>", with: "\n")
+            .replacingOccurrences(of: "(?i)<blockquote[^>]*>", with: "\n> ", options: .regularExpression)
+            .replacingOccurrences(of: "(?i)</blockquote>", with: "\n", options: .regularExpression)
+            .replacingOccurrences(of: "(?i)<br\\s*/?>", with: "\n", options: .regularExpression)
+            .replacingOccurrences(of: "(?i)</p>", with: "\n\n", options: .regularExpression)
+            .replacingOccurrences(of: "(?i)<li[^>]*>", with: "• ", options: .regularExpression)
+            .replacingOccurrences(of: "(?i)</li>", with: "\n", options: .regularExpression)
             .replacingOccurrences(of: "<[^>]+>", with: "", options: .regularExpression)
+            .replacingOccurrences(of: "&nbsp;", with: " ")
+            .replacingOccurrences(of: "&amp;", with: "&")
+            .replacingOccurrences(of: "&lt;", with: "<")
+            .replacingOccurrences(of: "&gt;", with: ">")
+            .replacingOccurrences(of: "&#39;", with: "'")
+            .replacingOccurrences(of: "&quot;", with: "\"")
             .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 

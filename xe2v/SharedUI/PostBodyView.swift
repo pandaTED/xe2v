@@ -13,13 +13,31 @@ struct PostBodyView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            SelectableTextView(attributedText: makeNSAttributed(markdownOrPlain))
-                .frame(maxWidth: .infinity, alignment: .leading)
+        VStack(alignment: .leading, spacing: 14) {
+            ForEach(Array(textBlocks.enumerated()), id: \.offset) { _, block in
+                switch block {
+                case .paragraph(let text):
+                    SelectableTextView(attributedText: makeNSAttributed(text, style: .body))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+
+                case .quote(let text):
+                    HStack(alignment: .top, spacing: 10) {
+                        RoundedRectangle(cornerRadius: 1)
+                            .fill(Color.secondary.opacity(0.45))
+                            .frame(width: 3)
+
+                        SelectableTextView(attributedText: makeNSAttributed(text, style: .quote))
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .padding(.vertical, 10)
+                    .padding(.horizontal, 10)
+                    .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
+                }
+            }
 
             let imageURLs = collectImageURLs()
             if !imageURLs.isEmpty {
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 120), spacing: 8)], spacing: 8) {
+                VStack(spacing: 10) {
                     ForEach(imageURLs, id: \.absoluteString) { url in
                         Button {
                             previewImageURL = url
@@ -28,32 +46,37 @@ struct PostBodyView: View {
                                 switch phase {
                                 case .empty:
                                     ZStack {
-                                        RoundedRectangle(cornerRadius: 8)
+                                        RoundedRectangle(cornerRadius: 12)
                                             .fill(.quaternary)
                                         ProgressView()
                                     }
                                 case .success(let image):
                                     image
                                         .resizable()
-                                        .scaledToFill()
+                                        .scaledToFit()
                                 case .failure:
                                     ZStack {
-                                        RoundedRectangle(cornerRadius: 8)
+                                        RoundedRectangle(cornerRadius: 12)
                                             .fill(.quaternary)
-                                        Image(systemName: "photo")
+                                        Label("图片加载失败", systemImage: "photo")
+                                            .font(.caption)
                                             .foregroundStyle(.secondary)
                                     }
                                 @unknown default:
                                     EmptyView()
                                 }
                             }
-                            .frame(height: 90)
-                            .clipped()
-                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                            .frame(maxWidth: .infinity, minHeight: 140, maxHeight: 320)
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                            .overlay {
+                                RoundedRectangle(cornerRadius: 12)
+                                    .strokeBorder(Color.secondary.opacity(0.15))
+                            }
                         }
                         .buttonStyle(.plain)
                     }
                 }
+                .padding(.top, 4)
             }
         }
         .sheet(isPresented: Binding(
@@ -92,6 +115,50 @@ struct PostBodyView: View {
         }
     }
 
+    private var textBlocks: [TextBlock] {
+        parseTextBlocks(markdownOrPlain)
+    }
+
+    private func parseTextBlocks(_ text: String) -> [TextBlock] {
+        let lines = text.components(separatedBy: .newlines)
+        var blocks: [TextBlock] = []
+        var paragraphBuffer: [String] = []
+        var quoteBuffer: [String] = []
+
+        func flushParagraph() {
+            let joined = paragraphBuffer.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
+            if !joined.isEmpty { blocks.append(.paragraph(joined)) }
+            paragraphBuffer.removeAll()
+        }
+
+        func flushQuote() {
+            let joined = quoteBuffer.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
+            if !joined.isEmpty { blocks.append(.quote(joined)) }
+            quoteBuffer.removeAll()
+        }
+
+        for line in lines {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            if trimmed.hasPrefix(">") {
+                flushParagraph()
+                let quoteLine = trimmed.replacingOccurrences(of: "^>+\\s?", with: "", options: .regularExpression)
+                quoteBuffer.append(quoteLine)
+            } else {
+                flushQuote()
+                paragraphBuffer.append(line)
+            }
+        }
+
+        flushQuote()
+        flushParagraph()
+
+        if blocks.isEmpty {
+            let fallback = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !fallback.isEmpty { return [.paragraph(fallback)] }
+        }
+        return blocks
+    }
+
     private func makeAttributed(_ text: String) -> AttributedString {
         if let parsed = try? AttributedString(markdown: text) {
             return highlightMentions(in: parsed)
@@ -99,17 +166,35 @@ struct PostBodyView: View {
         return highlightMentions(in: AttributedString(text))
     }
 
-    private func makeNSAttributed(_ text: String) -> NSAttributedString {
+    private func makeNSAttributed(_ text: String, style: TextStyle) -> NSAttributedString {
         let attr = makeAttributed(text)
         let ns = NSMutableAttributedString(attributedString: NSAttributedString(attr))
 
         let paragraph = NSMutableParagraphStyle()
-        paragraph.lineSpacing = 5
-        paragraph.paragraphSpacing = 10
         paragraph.lineBreakMode = .byWordWrapping
 
+        switch style {
+        case .body:
+            paragraph.lineSpacing = 7
+            paragraph.paragraphSpacing = 14
+        case .quote:
+            paragraph.lineSpacing = 5
+            paragraph.paragraphSpacing = 10
+        }
+
         ns.addAttribute(.paragraphStyle, value: paragraph, range: NSRange(location: 0, length: ns.length))
-        ns.addAttribute(.font, value: UIFont.preferredFont(forTextStyle: .body), range: NSRange(location: 0, length: ns.length))
+
+        let fallbackFont = UIFont.preferredFont(forTextStyle: style == .body ? .body : .callout)
+        ns.enumerateAttribute(.font, in: NSRange(location: 0, length: ns.length)) { value, range, _ in
+            if value == nil {
+                ns.addAttribute(.font, value: fallbackFont, range: range)
+            }
+        }
+
+        if style == .quote {
+            ns.addAttribute(.foregroundColor, value: UIColor.secondaryLabel, range: NSRange(location: 0, length: ns.length))
+        }
+
         return ns
     }
 
@@ -163,4 +248,14 @@ private extension URL {
         let ext = pathExtension.lowercased()
         return ["jpg", "jpeg", "png", "gif", "webp", "heic"].contains(ext)
     }
+}
+
+private enum TextBlock {
+    case paragraph(String)
+    case quote(String)
+}
+
+private enum TextStyle {
+    case body
+    case quote
 }

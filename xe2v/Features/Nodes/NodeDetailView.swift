@@ -13,6 +13,7 @@ struct NodeDetailView: View {
     @State private var paginationErrorMessage: String?
     @State private var duplicatePageCount = 0
     @State private var selectedUsername: String?
+    @State private var bottomVisible = false
 
     var body: some View {
         Group {
@@ -56,8 +57,13 @@ struct NodeDetailView: View {
                     } else if hasMore, !topics.isEmpty {
                         Color.clear
                             .frame(height: 1)
+                            .id("node-bottom-\(node.name)-\(topics.count)-\(page)")
                             .onAppear {
+                                bottomVisible = true
                                 loadMoreIfNeeded(index: max(topics.count - 1, 0))
+                            }
+                            .onDisappear {
+                                bottomVisible = false
                             }
                         .listRowSeparator(.hidden)
                     }
@@ -95,6 +101,11 @@ struct NodeDetailView: View {
             NavigationStack {
                 MemberProfileView(env: env, username: item.value)
             }
+        }
+        .onChange(of: loadingMore) { oldValue, newValue in
+            guard oldValue, !newValue else { return }
+            guard bottomVisible, hasMore else { return }
+            loadMoreIfNeeded(index: max(topics.count - 1, 0))
         }
     }
 

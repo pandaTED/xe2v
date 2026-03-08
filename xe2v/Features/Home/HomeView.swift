@@ -6,6 +6,7 @@ struct HomeView: View {
 
     @State private var viewModel: HomeViewModel
     @State private var selectedUsername: String?
+    @State private var bottomVisible = false
 
     init(env: AppEnvironment, selectedTopic: Binding<V2EXTopic?>) {
         self._env = Bindable(env)
@@ -59,6 +60,11 @@ struct HomeView: View {
             NavigationStack {
                 MemberProfileView(env: env, username: item.value)
             }
+        }
+        .onChange(of: viewModel.isLoadingMore) { oldValue, newValue in
+            guard oldValue, !newValue else { return }
+            guard bottomVisible, viewModel.hasMore else { return }
+            viewModel.loadMoreIfNeeded(currentIndex: max(viewModel.topics.count - 1, 0))
         }
     }
 
@@ -117,8 +123,13 @@ struct HomeView: View {
             } else if viewModel.hasMore, !viewModel.topics.isEmpty {
                 Color.clear
                     .frame(height: 1)
+                    .id("home-bottom-\(viewModel.topics.count)-\(viewModel.page)")
                     .onAppear {
+                        bottomVisible = true
                         viewModel.loadMoreIfNeeded(currentIndex: max(viewModel.topics.count - 1, 0))
+                    }
+                    .onDisappear {
+                        bottomVisible = false
                     }
                 .listRowSeparator(.hidden)
             }

@@ -13,21 +13,21 @@ final class V2EXRepository: V2EXRepositoryProtocol {
     }
 
     func refreshHome(feed: TopicFeedType, page: Int, pageSize: Int) async throws -> [V2EXTopic] {
-        if feed == .latest, page > 1 {
+        if feed == .latest {
             do {
-                let webList = try await webSession.fetchHomeTopicsViaWeb(feed: feed, page: page)
+                let webList = uniqueTopics(try await webSession.fetchHomeTopicsViaWeb(feed: feed, page: page))
                 if !webList.isEmpty {
                     await memberCache.save(members: webList.map(\.member))
                     return webList
                 }
 
                 DebugLog.info("home WEB empty on page=\(page), fallback API", category: "Repo")
-                let apiList = try await readAPI.fetchLatestTopics(page: page, pageSize: pageSize)
+                let apiList = uniqueTopics(try await readAPI.fetchLatestTopics(page: page, pageSize: pageSize))
                 await memberCache.save(members: apiList.map(\.member))
                 return apiList
             } catch {
                 DebugLog.info("home WEB page=\(page) failed, fallback API, error=\(error.localizedDescription)", category: "Repo")
-                let apiList = try await readAPI.fetchLatestTopics(page: page, pageSize: pageSize)
+                let apiList = uniqueTopics(try await readAPI.fetchLatestTopics(page: page, pageSize: pageSize))
                 await memberCache.save(members: apiList.map(\.member))
                 return apiList
             }
@@ -37,19 +37,19 @@ final class V2EXRepository: V2EXRepositoryProtocol {
             DebugLog.info("home load via API feed=\(feed.rawValue) page=\(page)", category: "Repo")
             switch feed {
             case .hot:
-                let list = try await readAPI.fetchHotTopics()
+                let list = uniqueTopics(try await readAPI.fetchHotTopics())
                 await memberCache.save(members: list.map(\.member))
                 DebugLog.info("home API result count=\(list.count)", category: "Repo")
                 return list
             case .latest:
-                let list = try await readAPI.fetchLatestTopics(page: page, pageSize: pageSize)
+                let list = uniqueTopics(try await readAPI.fetchLatestTopics(page: page, pageSize: pageSize))
                 await memberCache.save(members: list.map(\.member))
                 DebugLog.info("home API result count=\(list.count)", category: "Repo")
                 return list
             }
         } catch {
             DebugLog.info("home API failed, fallback WEB feed=\(feed.rawValue) page=\(page), error=\(error.localizedDescription)", category: "Repo")
-            let list = try await webSession.fetchHomeTopicsViaWeb(feed: feed, page: page)
+            let list = uniqueTopics(try await webSession.fetchHomeTopicsViaWeb(feed: feed, page: page))
             await memberCache.save(members: list.map(\.member))
             DebugLog.info("home WEB result count=\(list.count)", category: "Repo")
             return list
@@ -89,13 +89,13 @@ final class V2EXRepository: V2EXRepositoryProtocol {
         // 节点分页统一按网页规则 /go/{node}?p={page}
         do {
             DebugLog.info("node topics via WEB node=\(nodeName) page=\(page)", category: "Repo")
-            let topics = try await webSession.fetchTopicsViaWeb(nodeName: nodeName, page: page)
+            let topics = uniqueTopics(try await webSession.fetchTopicsViaWeb(nodeName: nodeName, page: page))
             await memberCache.save(members: topics.map(\.member))
             DebugLog.info("node topics WEB result count=\(topics.count)", category: "Repo")
 
             if page == 1, topics.isEmpty {
                 DebugLog.info("node topics WEB empty on first page, fallback API node=\(nodeName)", category: "Repo")
-                let apiTopics = try await readAPI.fetchTopics(nodeName: nodeName, page: page, pageSize: pageSize)
+                let apiTopics = uniqueTopics(try await readAPI.fetchTopics(nodeName: nodeName, page: page, pageSize: pageSize))
                 await memberCache.save(members: apiTopics.map(\.member))
                 DebugLog.info("node topics API fallback result count=\(apiTopics.count)", category: "Repo")
                 return apiTopics
@@ -103,7 +103,7 @@ final class V2EXRepository: V2EXRepositoryProtocol {
             return topics
         } catch {
             DebugLog.info("node topics WEB failed, fallback API node=\(nodeName) page=\(page), error=\(error.localizedDescription)", category: "Repo")
-            let apiTopics = try await readAPI.fetchTopics(nodeName: nodeName, page: page, pageSize: pageSize)
+            let apiTopics = uniqueTopics(try await readAPI.fetchTopics(nodeName: nodeName, page: page, pageSize: pageSize))
             await memberCache.save(members: apiTopics.map(\.member))
             DebugLog.info("node topics API fallback result count=\(apiTopics.count)", category: "Repo")
             return apiTopics
@@ -138,5 +138,15 @@ final class V2EXRepository: V2EXRepositoryProtocol {
 
     func submitTopic(_ request: ComposeTopicRequest) async throws {
         try await webSession.submitTopic(request)
+    }
+
+    private func uniqueTopics(_ list: [V2EXTopic]) -> [V2EXTopic] {
+        var seen: Set<Int> = []
+        var result: [V2EXTopic] = []
+        result.reserveCapacity(list.count)
+        for item in list where seen.insert(item.id).inserted {
+            result.append(item)
+        }
+        return result
     }
 }

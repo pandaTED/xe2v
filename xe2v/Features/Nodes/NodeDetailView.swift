@@ -11,13 +11,14 @@ struct NodeDetailView: View {
     @State private var hasMore = true
     @State private var loadingMore = false
     @State private var paginationErrorMessage: String?
+    @State private var duplicatePageCount = 0
     @State private var selectedUsername: String?
 
     var body: some View {
         Group {
             if case .loaded = state {
                 List {
-                    ForEach(Array(topics.enumerated()), id: \.element.id) { index, topic in
+                    ForEach(Array(topics.enumerated()), id: \.offset) { index, topic in
                         TopicRowView(topic: topic,
                                      isRead: env.readHistory.isRead(topic.id),
                                      fontScale: env.settings.fontScale,
@@ -103,6 +104,7 @@ struct NodeDetailView: View {
         guard !topics.isEmpty else { return }
         let threshold = max(topics.count - 4, 0)
         guard index >= threshold else { return }
+        DebugLog.info("node detail trigger loadMore node=\(node.name) index=\(index) count=\(topics.count) page=\(page)", category: "NodeDetail")
         loadingMore = true
         Task {
             await load(reset: false)
@@ -126,30 +128,35 @@ struct NodeDetailView: View {
             page = 1
             hasMore = true
             paginationErrorMessage = nil
+            duplicatePageCount = 0
         }
         DebugLog.info("node detail load start node=\(node.name) page=\(page) reset=\(reset)", category: "NodeDetail")
         do {
-            let list = try await env.repository.topics(nodeName: node.name, page: page, pageSize: 20)
+            let list = uniqueTopics(try await env.repository.topics(nodeName: node.name, page: page, pageSize: 20))
             if reset {
                 topics = list
+                hasMore = !topics.isEmpty
+                if hasMore { page = 2 }
             } else {
                 let existing = Set(topics.map(\.id))
                 let deduped = list.filter { !existing.contains($0.id) }
                 topics.append(contentsOf: deduped)
                 paginationErrorMessage = nil
-                if deduped.isEmpty {
+
+                if list.isEmpty {
                     hasMore = false
+                } else if deduped.isEmpty {
+                    duplicatePageCount += 1
+                    page += 1
+                    hasMore = duplicatePageCount < 3
+                    DebugLog.info("node detail duplicate page count=\(duplicatePageCount) keepPaging=\(hasMore)", category: "NodeDetail")
+                } else {
+                    duplicatePageCount = 0
+                    page += 1
                 }
             }
 
-            if list.isEmpty {
-                hasMore = false
-            }
-
             state = topics.isEmpty ? .empty(message: "该节点暂无主题") : .loaded
-            if hasMore {
-                page += 1
-            }
             DebugLog.info("node detail load success node=\(node.name) total=\(topics.count) nextPage=\(page) hasMore=\(hasMore)", category: "NodeDetail")
         } catch is CancellationError {
             DebugLog.info("node detail load cancelled node=\(node.name)", category: "NodeDetail")
@@ -163,6 +170,16 @@ struct NodeDetailView: View {
             }
             DebugLog.info("node detail load failed node=\(node.name) msg=\(msg)", category: "NodeDetail")
         }
+    }
+
+    private func uniqueTopics(_ list: [V2EXTopic]) -> [V2EXTopic] {
+        var seen: Set<Int> = []
+        var result: [V2EXTopic] = []
+        result.reserveCapacity(list.count)
+        for item in list where seen.insert(item.id).inserted {
+            result.append(item)
+        }
+        return result
     }
 }
 

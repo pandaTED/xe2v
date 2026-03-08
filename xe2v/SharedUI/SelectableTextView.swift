@@ -51,8 +51,12 @@ struct SelectableTextView: UIViewRepresentable {
 final class Base64SelectableTextView: UITextView {
     func decodeSelectedBase64AndCopy(range: NSRange) {
         let selected = (text as NSString).substring(with: range)
-        guard let output = selected.decodedBase64String else { return }
+        guard let output = selected.decodedBase64String else {
+            NotificationCenter.default.post(name: .appToastMessage, object: "Base64 解码失败")
+            return
+        }
         UIPasteboard.general.string = output
+        NotificationCenter.default.post(name: .appToastMessage, object: "Base64 已解码并复制")
         DebugLog.info("base64 decoded and copied length=\(output.count)", category: "TextSelect")
     }
 }

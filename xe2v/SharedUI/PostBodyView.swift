@@ -215,7 +215,9 @@ struct PostBodyView: View {
     }
 
     private func collectImageURLs() -> [URL] {
-        let fromText = detectURLs(markdownOrPlain).filter(\.isImageURL)
+        let fromText = detectURLs(markdownOrPlain)
+            .compactMap { ImageURLNormalizer.normalizedURL(from: $0.absoluteString) }
+            .filter(\.isLikelyImageURL)
         let fromHTML = detectImageURLFromHTML(rawHTML)
         let merged = (fromText + fromHTML)
         var seen = Set<String>()
@@ -238,15 +240,8 @@ struct PostBodyView: View {
         let range = NSRange(location: 0, length: ns.length)
         return regex.matches(in: html, range: range).compactMap { match in
             guard match.numberOfRanges > 1 else { return nil }
-            return URL(string: ns.substring(with: match.range(at: 1)))
+            return ImageURLNormalizer.normalizedURL(from: ns.substring(with: match.range(at: 1)))
         }
-    }
-}
-
-private extension URL {
-    var isImageURL: Bool {
-        let ext = pathExtension.lowercased()
-        return ["jpg", "jpeg", "png", "gif", "webp", "heic"].contains(ext)
     }
 }
 

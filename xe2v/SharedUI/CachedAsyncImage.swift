@@ -5,7 +5,7 @@ struct CachedAsyncImage: View {
     let size: CGFloat
 
     var body: some View {
-        if let url = URL(string: urlString ?? "") {
+        if let url = ImageURLNormalizer.normalizedURL(from: urlString) {
             AsyncImage(url: url, transaction: .init(animation: .easeInOut(duration: 0.2))) { phase in
                 switch phase {
                 case .empty:

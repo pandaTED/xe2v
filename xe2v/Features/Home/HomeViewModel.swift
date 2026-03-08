@@ -14,6 +14,7 @@ final class HomeViewModel {
     var hasMore = true
     var isLoadingMore = false
     var paginationErrorMessage: String?
+    private var duplicatePageCount = 0
     private var isRefreshing = false
 
     init(repository: V2EXRepositoryProtocol) {
@@ -47,6 +48,7 @@ final class HomeViewModel {
         guard !topics.isEmpty else { return }
         let threshold = max(topics.count - 4, 0)
         guard currentIndex >= threshold else { return }
+        DebugLog.info("home vm trigger loadMore index=\(currentIndex) count=\(topics.count) page=\(page)", category: "HomeVM")
         isLoadingMore = true
         Task { [weak self] in
             guard let self else { return }
@@ -72,6 +74,7 @@ final class HomeViewModel {
             page = 1
             hasMore = true
             paginationErrorMessage = nil
+            duplicatePageCount = 0
         }
         DebugLog.info("home vm load start feed=\(feedType.rawValue) page=\(page) reset=\(reset)", category: "HomeVM")
 
@@ -83,27 +86,33 @@ final class HomeViewModel {
                 list = try await repository.refreshHome(feed: feedType, page: page, pageSize: 20)
             }
 
-            let existing = Set(topics.map(\.id))
-            let deduped = list.filter { !existing.contains($0.id) }
-
             if reset {
-                topics = list
+                topics = uniqueTopics(list)
             } else {
+                let existing = Set(topics.map(\.id))
+                let deduped = list.filter { !existing.contains($0.id) }
                 topics.append(contentsOf: deduped)
                 paginationErrorMessage = nil
+
+                if list.isEmpty {
+                    hasMore = false
+                } else if deduped.isEmpty {
+                    duplicatePageCount += 1
+                    page += 1
+                    hasMore = duplicatePageCount < 3
+                    DebugLog.info("home vm duplicate page count=\(duplicatePageCount) keepPaging=\(hasMore)", category: "HomeVM")
+                } else {
+                    duplicatePageCount = 0
+                    page += 1
+                }
             }
 
-            if topics.isEmpty {
-                state = .empty(message: "暂无主题")
-            } else {
-                state = .loaded
+            if reset {
+                hasMore = !topics.isEmpty
+                if hasMore { page = 2 }
             }
 
-            if list.isEmpty || (!reset && deduped.isEmpty) {
-                hasMore = false
-            } else {
-                page += 1
-            }
+            state = topics.isEmpty ? .empty(message: "暂无主题") : .loaded
             if !hasMore {
                 DebugLog.info("home vm paging stopped hasMore=false", category: "HomeVM")
             }
@@ -120,5 +129,15 @@ final class HomeViewModel {
             }
             DebugLog.info("home vm load failed reset=\(reset) msg=\(message)", category: "HomeVM")
         }
+    }
+
+    private func uniqueTopics(_ list: [V2EXTopic]) -> [V2EXTopic] {
+        var seen: Set<Int> = []
+        var result: [V2EXTopic] = []
+        result.reserveCapacity(list.count)
+        for item in list where seen.insert(item.id).inserted {
+            result.append(item)
+        }
+        return result
     }
 }

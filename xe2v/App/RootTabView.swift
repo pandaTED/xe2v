@@ -1,4 +1,5 @@
 import SwiftUI
+import Combine
 
 struct RootTabView: View {
     @Bindable var env: AppEnvironment
@@ -59,6 +60,11 @@ struct RootTabView: View {
                             env.toastMessage = nil
                         }
                     }
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .appToastMessage)) { notification in
+            if let message = notification.object as? String, !message.isEmpty {
+                env.toastMessage = message
             }
         }
     }

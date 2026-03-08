@@ -78,7 +78,7 @@ struct HomeView: View {
                 }
             }
 
-            ForEach(Array(viewModel.topics.enumerated()), id: \.element.id) { index, topic in
+            ForEach(Array(viewModel.topics.enumerated()), id: \.offset) { index, topic in
                 TopicRowView(topic: topic,
                              isRead: env.readHistory.isRead(topic.id),
                              fontScale: env.settings.fontScale,

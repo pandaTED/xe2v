@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct PostBodyView: View {
     let markdownOrPlain: String
@@ -13,7 +14,8 @@ struct PostBodyView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            SelectableTextView(attributedText: NSAttributedString(makeAttributed(markdownOrPlain)))
+            SelectableTextView(attributedText: makeNSAttributed(markdownOrPlain))
+                .frame(maxWidth: .infinity, alignment: .leading)
 
             let imageURLs = collectImageURLs()
             if !imageURLs.isEmpty {
@@ -95,6 +97,20 @@ struct PostBodyView: View {
             return highlightMentions(in: parsed)
         }
         return highlightMentions(in: AttributedString(text))
+    }
+
+    private func makeNSAttributed(_ text: String) -> NSAttributedString {
+        let attr = makeAttributed(text)
+        let ns = NSMutableAttributedString(attributedString: NSAttributedString(attr))
+
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.lineSpacing = 5
+        paragraph.paragraphSpacing = 10
+        paragraph.lineBreakMode = .byWordWrapping
+
+        ns.addAttribute(.paragraphStyle, value: paragraph, range: NSRange(location: 0, length: ns.length))
+        ns.addAttribute(.font, value: UIFont.preferredFont(forTextStyle: .body), range: NSRange(location: 0, length: ns.length))
+        return ns
     }
 
     private func highlightMentions(in attributed: AttributedString) -> AttributedString {

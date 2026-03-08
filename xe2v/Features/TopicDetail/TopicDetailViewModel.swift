@@ -57,6 +57,8 @@ final class TopicDetailViewModel {
             state = .loaded
             replyPage += 1
             DebugLog.info("topic detail load success id=\(topicID) replies=\(replies.count) nextPage=\(replyPage)", category: "TopicVM")
+        } catch is CancellationError {
+            DebugLog.info("topic detail load cancelled id=\(topicID)", category: "TopicVM")
         } catch {
             let msg = (error as? AppError)?.localizedDescription ?? error.localizedDescription
             state = .failed(message: msg)

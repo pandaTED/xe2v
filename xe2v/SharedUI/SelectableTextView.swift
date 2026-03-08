@@ -18,6 +18,9 @@ struct SelectableTextView: UIViewRepresentable {
         textView.textContainer.lineFragmentPadding = 0
         textView.dataDetectorTypes = [.link]
         textView.adjustsFontForContentSizeCategory = true
+        textView.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        textView.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        textView.linkTextAttributes = [.foregroundColor: UIColor.systemBlue]
         textView.delegate = context.coordinator
         return textView
     }

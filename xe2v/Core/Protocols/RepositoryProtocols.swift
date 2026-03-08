@@ -17,6 +17,9 @@ protocol V2EXWebSessionProtocol: AnyObject {
     func restoreSessionIfPossible() async
     func bridgeCookies(_ cookies: [HTTPCookie], username: String?) async throws
     func logout() async
+    func fetchHomeTopicsViaWeb(feed: TopicFeedType, page: Int) async throws -> [V2EXTopic]
+    func fetchNodesViaWeb() async throws -> [V2EXNode]
+    func fetchTopicsViaWeb(nodeName: String, page: Int) async throws -> [V2EXTopic]
     func fetchNotificationsViaWeb() async throws -> [V2EXNotification]
     func fetchReplyFormToken(topicID: Int) async throws -> FormToken
     func submitReply(_ request: ReplyRequest) async throws

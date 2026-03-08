@@ -11,11 +11,18 @@ final class V2EXRepository: V2EXRepositoryProtocol {
     }
 
     func refreshHome(feed: TopicFeedType, page: Int, pageSize: Int) async throws -> [V2EXTopic] {
-        switch feed {
-        case .hot:
-            return try await readAPI.fetchHotTopics()
-        case .latest:
-            return try await readAPI.fetchLatestTopics(page: page, pageSize: pageSize)
+        do {
+            switch feed {
+            case .hot:
+                return try await readAPI.fetchHotTopics()
+            case .latest:
+                return try await readAPI.fetchLatestTopics(page: page, pageSize: pageSize)
+            }
+        } catch {
+            if case .fullAccess = webSession.sessionState {
+                return try await webSession.fetchHomeTopicsViaWeb(feed: feed, page: page)
+            }
+            throw error
         }
     }
 
@@ -26,11 +33,25 @@ final class V2EXRepository: V2EXRepositoryProtocol {
     }
 
     func nodes() async throws -> [V2EXNode] {
-        try await readAPI.fetchNodes()
+        do {
+            return try await readAPI.fetchNodes()
+        } catch {
+            if case .fullAccess = webSession.sessionState {
+                return try await webSession.fetchNodesViaWeb()
+            }
+            throw error
+        }
     }
 
     func topics(nodeName: String, page: Int, pageSize: Int) async throws -> [V2EXTopic] {
-        try await readAPI.fetchTopics(nodeName: nodeName, page: page, pageSize: pageSize)
+        do {
+            return try await readAPI.fetchTopics(nodeName: nodeName, page: page, pageSize: pageSize)
+        } catch {
+            if case .fullAccess = webSession.sessionState {
+                return try await webSession.fetchTopicsViaWeb(nodeName: nodeName, page: page)
+            }
+            throw error
+        }
     }
 
     func notifications() async throws -> [V2EXNotification] {

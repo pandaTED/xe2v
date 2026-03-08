@@ -58,6 +58,11 @@ struct NotificationsView: View {
                 await vm.load()
             }
         }
+        .onAppear {
+            if vm.state == .idle {
+                Task { await vm.load() }
+            }
+        }
         .refreshable {
             await vm.load()
         }

@@ -42,6 +42,11 @@ struct HomeView: View {
                 viewModel.refresh()
             }
         }
+        .onAppear {
+            if viewModel.state == .idle {
+                viewModel.refresh()
+            }
+        }
     }
 
     private var listView: some View {

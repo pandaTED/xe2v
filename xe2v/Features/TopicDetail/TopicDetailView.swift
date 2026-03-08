@@ -47,6 +47,11 @@ struct TopicDetailView: View {
                 viewModel.load(reset: true)
             }
         }
+        .onAppear {
+            if viewModel.state == .idle {
+                viewModel.load(reset: true)
+            }
+        }
     }
 
     private var contentView: some View {

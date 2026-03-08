@@ -7,7 +7,13 @@ struct StateView: View {
     var body: some View {
         switch state {
         case .idle:
-            EmptyView()
+            VStack(spacing: 12) {
+                ProgressView()
+                Text("正在加载...")
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .padding(.top, 40)
         case .loading:
             VStack(spacing: 12) {
                 ProgressView()

@@ -60,6 +60,30 @@ final class V2EXWebSession: ObservableObject, V2EXWebSessionProtocol {
         sessionState = .unauthenticated
     }
 
+    func fetchHomeTopicsViaWeb(feed: TopicFeedType, page: Int) async throws -> [V2EXTopic] {
+        let path: String
+        switch feed {
+        case .hot:
+            path = "?tab=hot"
+        case .latest:
+            path = page <= 1 ? "recent" : "recent?p=\(page)"
+        }
+        let url = try makeURL(path: path)
+        let html = try await fetchHTML(url: url)
+        return TopicListHTMLParser.parseTopics(html: html)
+    }
+
+    func fetchNodesViaWeb() async throws -> [V2EXNode] {
+        let html = try await fetchHTML(url: try makeURL(path: "planes"))
+        return TopicListHTMLParser.parseNodes(html: html)
+    }
+
+    func fetchTopicsViaWeb(nodeName: String, page: Int) async throws -> [V2EXTopic] {
+        let path = page <= 1 ? "go/\(nodeName)" : "go/\(nodeName)?p=\(page)"
+        let html = try await fetchHTML(url: try makeURL(path: path))
+        return TopicListHTMLParser.parseTopics(html: html)
+    }
+
     func fetchNotificationsViaWeb() async throws -> [V2EXNotification] {
         let url = try makeURL(path: "notifications")
         let html = try await fetchHTML(url: url)
@@ -182,6 +206,10 @@ final class V2EXWebSession: ObservableObject, V2EXWebSessionProtocol {
     }
 
     private func makeURL(path: String) throws -> URL {
+        if path.hasPrefix("?"), var components = URLComponents(url: baseURL, resolvingAgainstBaseURL: false) {
+            components.percentEncodedQuery = String(path.dropFirst())
+            if let url = components.url { return url }
+        }
         let normalized = path.hasPrefix("/") ? String(path.dropFirst()) : path
         guard let url = URL(string: normalized, relativeTo: baseURL)?.absoluteURL else {
             throw AppError.network("URL 无效")

@@ -41,5 +41,10 @@ struct NodesView: View {
                 await viewModel.load()
             }
         }
+        .onAppear {
+            if viewModel.state == .idle {
+                Task { await viewModel.load() }
+            }
+        }
     }
 }

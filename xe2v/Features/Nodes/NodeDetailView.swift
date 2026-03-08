@@ -38,6 +38,11 @@ struct NodeDetailView: View {
                 await load(reset: true)
             }
         }
+        .onAppear {
+            if state == .idle {
+                Task { await load(reset: true) }
+            }
+        }
         .refreshable {
             await load(reset: true)
         }

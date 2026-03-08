@@ -1,32 +1,20 @@
-//
-//  xe2vApp.swift
-//  xe2v
-//
-//  Created by 朱运鹏 on 2026/3/8.
-//
-
 import SwiftUI
-import SwiftData
 
 @main
 struct xe2vApp: App {
-    var sharedModelContainer: ModelContainer = {
-        let schema = Schema([
-            Item.self,
-        ])
-        let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
-
-        do {
-            return try ModelContainer(for: schema, configurations: [modelConfiguration])
-        } catch {
-            fatalError("Could not create ModelContainer: \(error)")
-        }
-    }()
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var environment = AppEnvironment()
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            RootTabView(env: environment)
         }
-        .modelContainer(sharedModelContainer)
+        .onChange(of: scenePhase) { _, newValue in
+            if newValue == .active {
+                Task {
+                    await environment.webSession.restoreSessionIfPossible()
+                }
+            }
+        }
     }
 }

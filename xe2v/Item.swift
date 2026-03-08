@@ -1,18 +1,4 @@
-//
-//  Item.swift
-//  xe2v
-//
-//  Created by 朱运鹏 on 2026/3/8.
-//
-
 import Foundation
-import SwiftData
 
-@Model
-final class Item {
-    var timestamp: Date
-    
-    init(timestamp: Date) {
-        self.timestamp = timestamp
-    }
-}
+// 兼容模板残留文件，已不使用
+struct Item {}

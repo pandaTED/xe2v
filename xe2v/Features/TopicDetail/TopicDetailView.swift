@@ -7,6 +7,8 @@ struct TopicDetailView: View {
     @State private var viewModel: TopicDetailViewModel
     @State private var showReplyComposer = false
     @State private var jumpToFloor: String = ""
+    @State private var showBackToTop = false
+    @State private var selectedUsername: String?
 
     init(env: AppEnvironment, topicID: Int) {
         self._env = Bindable(env)
@@ -42,6 +44,14 @@ struct TopicDetailView: View {
                 viewModel.load(reset: true)
             }
         }
+        .sheet(item: Binding(
+            get: { selectedUsername.map(UsernameItem.init) },
+            set: { selectedUsername = $0?.value }
+        )) { item in
+            NavigationStack {
+                MemberProfileView(env: env, username: item.value)
+            }
+        }
         .task {
             if viewModel.state == .idle {
                 viewModel.load(reset: true)
@@ -63,7 +73,10 @@ struct TopicDetailView: View {
                             Text(topic.title)
                                 .font(.title3.weight(.semibold))
                             HStack {
-                                Text(topic.member.username)
+                                Button(topic.member.username) {
+                                    selectedUsername = topic.member.username
+                                }
+                                .buttonStyle(.plain)
                                 Text("·")
                                 Text(topic.createdAt.relativeCN)
                                 Spacer()
@@ -72,8 +85,10 @@ struct TopicDetailView: View {
                             .font(.caption)
                             .foregroundStyle(.secondary)
 
-                            PostBodyView(markdownOrPlain: topic.content ?? HTMLContentRenderer.plainText(from: topic.contentRendered))
+                            PostBodyView(markdownOrPlain: topic.content ?? HTMLContentRenderer.plainText(from: topic.contentRendered),
+                                         rawHTML: topic.contentRendered)
                         }
+                        .id("topic-top")
                         .padding(.vertical, 8)
                     }
 
@@ -95,12 +110,16 @@ struct TopicDetailView: View {
                             ReplyRowView(reply: reply,
                                          floor: index + 1,
                                          fontScale: env.settings.fontScale,
+                                         onTapUser: {
+                                             selectedUsername = reply.member.username
+                                         },
                                          onQuote: {
                                              viewModel.quoteFloor = index + 1
                                              showReplyComposer = true
                                          })
                             .onAppear {
                                 viewModel.loadMoreIfNeeded(lastVisible: reply)
+                                showBackToTop = index > 6
                             }
                         }
                     }
@@ -110,6 +129,26 @@ struct TopicDetailView: View {
             .refreshable {
                 viewModel.load(reset: true)
             }
+            .overlay(alignment: .bottomTrailing) {
+                if showBackToTop {
+                    Button {
+                        withAnimation {
+                            proxy.scrollTo("topic-top", anchor: .top)
+                        }
+                    } label: {
+                        Image(systemName: "arrow.up")
+                            .font(.headline)
+                            .padding(10)
+                            .background(.thinMaterial, in: Circle())
+                    }
+                    .padding(16)
+                }
+            }
         }
     }
+}
+
+private struct UsernameItem: Identifiable {
+    var id: String { value }
+    let value: String
 }

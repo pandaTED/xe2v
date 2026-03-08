@@ -4,41 +4,51 @@ import Foundation
 final class V2EXRepository: V2EXRepositoryProtocol {
     private let readAPI: V2EXReadAPIProtocol
     private let webSession: V2EXWebSessionProtocol
+    private let memberCache: MemberCacheStore
 
-    init(readAPI: V2EXReadAPIProtocol, webSession: V2EXWebSessionProtocol) {
+    init(readAPI: V2EXReadAPIProtocol, webSession: V2EXWebSessionProtocol, memberCache: MemberCacheStore) {
         self.readAPI = readAPI
         self.webSession = webSession
+        self.memberCache = memberCache
     }
 
     func refreshHome(feed: TopicFeedType, page: Int, pageSize: Int) async throws -> [V2EXTopic] {
+        if feed == .latest, page > 1 {
+            let list = try await webSession.fetchHomeTopicsViaWeb(feed: feed, page: page)
+            await memberCache.save(members: list.map(\.member))
+            return list
+        }
+
         do {
             DebugLog.info("home load via API feed=\(feed.rawValue) page=\(page)", category: "Repo")
             switch feed {
             case .hot:
                 let list = try await readAPI.fetchHotTopics()
+                await memberCache.save(members: list.map(\.member))
                 DebugLog.info("home API result count=\(list.count)", category: "Repo")
                 return list
             case .latest:
                 let list = try await readAPI.fetchLatestTopics(page: page, pageSize: pageSize)
+                await memberCache.save(members: list.map(\.member))
                 DebugLog.info("home API result count=\(list.count)", category: "Repo")
                 return list
             }
         } catch {
-            if case .fullAccess = webSession.sessionState {
-                DebugLog.info("home API failed, fallback WEB feed=\(feed.rawValue) page=\(page), error=\(error.localizedDescription)", category: "Repo")
-                let list = try await webSession.fetchHomeTopicsViaWeb(feed: feed, page: page)
-                DebugLog.info("home WEB result count=\(list.count)", category: "Repo")
-                return list
-            }
-            DebugLog.info("home load failed no fallback, error=\(error.localizedDescription)", category: "Repo")
-            throw error
+            DebugLog.info("home API failed, fallback WEB feed=\(feed.rawValue) page=\(page), error=\(error.localizedDescription)", category: "Repo")
+            let list = try await webSession.fetchHomeTopicsViaWeb(feed: feed, page: page)
+            await memberCache.save(members: list.map(\.member))
+            DebugLog.info("home WEB result count=\(list.count)", category: "Repo")
+            return list
         }
     }
 
     func topicDetail(id: Int, replyPage: Int, replyPageSize: Int) async throws -> TopicDetailBundle {
         async let topic = readAPI.fetchTopic(id: id)
         async let replies = readAPI.fetchReplies(topicID: id, page: replyPage, pageSize: replyPageSize)
-        return try await TopicDetailBundle(topic: topic, replies: replies)
+        let bundle = try await TopicDetailBundle(topic: topic, replies: replies)
+        await memberCache.save(member: bundle.topic.member)
+        await memberCache.save(members: bundle.replies.map(\.member))
+        return bundle
     }
 
     func nodes() async throws -> [V2EXNode] {
@@ -46,16 +56,18 @@ final class V2EXRepository: V2EXRepositoryProtocol {
             DebugLog.info("nodes load via API", category: "Repo")
             let nodes = try await readAPI.fetchNodes()
             DebugLog.info("nodes API result count=\(nodes.count)", category: "Repo")
-            return nodes
-        } catch {
-            if case .fullAccess = webSession.sessionState {
-                DebugLog.info("nodes API failed, fallback WEB, error=\(error.localizedDescription)", category: "Repo")
-                let nodes = try await webSession.fetchNodesViaWeb()
-                DebugLog.info("nodes WEB result count=\(nodes.count)", category: "Repo")
+            if nodes.isEmpty {
+                let fallback = try await webSession.fetchNodesViaWeb()
+                DebugLog.info("nodes API empty, fallback WEB count=\(fallback.count)", category: "Repo")
+                return fallback
+            } else {
                 return nodes
             }
-            DebugLog.info("nodes load failed no fallback, error=\(error.localizedDescription)", category: "Repo")
-            throw error
+        } catch {
+            DebugLog.info("nodes API failed, fallback WEB, error=\(error.localizedDescription)", category: "Repo")
+            let nodes = try await webSession.fetchNodesViaWeb()
+            DebugLog.info("nodes WEB result count=\(nodes.count)", category: "Repo")
+            return nodes
         }
     }
 
@@ -64,16 +76,21 @@ final class V2EXRepository: V2EXRepositoryProtocol {
             DebugLog.info("node topics via API node=\(nodeName) page=\(page)", category: "Repo")
             let topics = try await readAPI.fetchTopics(nodeName: nodeName, page: page, pageSize: pageSize)
             DebugLog.info("node topics API result count=\(topics.count)", category: "Repo")
-            return topics
-        } catch {
-            if case .fullAccess = webSession.sessionState {
-                DebugLog.info("node topics API failed, fallback WEB node=\(nodeName) page=\(page), error=\(error.localizedDescription)", category: "Repo")
-                let topics = try await webSession.fetchTopicsViaWeb(nodeName: nodeName, page: page)
-                DebugLog.info("node topics WEB result count=\(topics.count)", category: "Repo")
+            if topics.isEmpty {
+                let fallback = try await webSession.fetchTopicsViaWeb(nodeName: nodeName, page: page)
+                await memberCache.save(members: fallback.map(\.member))
+                DebugLog.info("node topics API empty, fallback WEB count=\(fallback.count)", category: "Repo")
+                return fallback
+            } else {
+                await memberCache.save(members: topics.map(\.member))
                 return topics
             }
-            DebugLog.info("node topics failed no fallback, node=\(nodeName), error=\(error.localizedDescription)", category: "Repo")
-            throw error
+        } catch {
+            DebugLog.info("node topics API failed, fallback WEB node=\(nodeName) page=\(page), error=\(error.localizedDescription)", category: "Repo")
+            let topics = try await webSession.fetchTopicsViaWeb(nodeName: nodeName, page: page)
+            await memberCache.save(members: topics.map(\.member))
+            DebugLog.info("node topics WEB result count=\(topics.count)", category: "Repo")
+            return topics
         }
     }
 
@@ -82,21 +99,21 @@ final class V2EXRepository: V2EXRepositoryProtocol {
             DebugLog.info("notifications via API", category: "Repo")
             let list = try await readAPI.fetchNotifications()
             DebugLog.info("notifications API result count=\(list.count)", category: "Repo")
+            await memberCache.save(members: list.compactMap(\.member))
             return list
         } catch {
-            if case .fullAccess = webSession.sessionState {
-                DebugLog.info("notifications API failed, fallback WEB, error=\(error.localizedDescription)", category: "Repo")
-                let list = try await webSession.fetchNotificationsViaWeb()
-                DebugLog.info("notifications WEB result count=\(list.count)", category: "Repo")
-                return list
-            }
-            DebugLog.info("notifications failed no fallback, error=\(error.localizedDescription)", category: "Repo")
-            throw error
+            DebugLog.info("notifications API failed, fallback WEB, error=\(error.localizedDescription)", category: "Repo")
+            let list = try await webSession.fetchNotificationsViaWeb()
+            await memberCache.save(members: list.compactMap(\.member))
+            DebugLog.info("notifications WEB result count=\(list.count)", category: "Repo")
+            return list
         }
     }
 
     func profile(username: String?) async throws -> V2EXMember {
-        try await readAPI.fetchProfile(username: username)
+        let member = try await readAPI.fetchProfile(username: username)
+        await memberCache.save(member: member)
+        return member
     }
 
     func submitReply(_ request: ReplyRequest) async throws {

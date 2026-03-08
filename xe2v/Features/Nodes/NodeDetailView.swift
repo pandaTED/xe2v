@@ -9,6 +9,7 @@ struct NodeDetailView: View {
     @State private var state: LoadState = .idle
     @State private var page = 1
     @State private var loadingMore = false
+    @State private var selectedUsername: String?
 
     var body: some View {
         Group {
@@ -16,7 +17,8 @@ struct NodeDetailView: View {
                 List(topics) { topic in
                     TopicRowView(topic: topic,
                                  isRead: env.readHistory.isRead(topic.id),
-                                 fontScale: env.settings.fontScale)
+                                 fontScale: env.settings.fontScale,
+                                 onTapUser: { selectedUsername = topic.member.username })
                         .onTapGesture {
                             env.readHistory.markRead(topicID: topic.id)
                             selectedTopic = topic
@@ -33,6 +35,16 @@ struct NodeDetailView: View {
             }
         }
         .navigationTitle(node.title)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    env.favorites.toggle(node: node)
+                } label: {
+                    Image(systemName: env.favorites.contains(node.name) ? "star.fill" : "star")
+                        .foregroundStyle(env.favorites.contains(node.name) ? .yellow : .primary)
+                }
+            }
+        }
         .task {
             if state == .idle {
                 await load(reset: true)
@@ -45,6 +57,14 @@ struct NodeDetailView: View {
         }
         .refreshable {
             await load(reset: true)
+        }
+        .sheet(item: Binding(
+            get: { selectedUsername.map(NodeUserItem.init) },
+            set: { selectedUsername = $0?.value }
+        )) { item in
+            NavigationStack {
+                MemberProfileView(env: env, username: item.value)
+            }
         }
     }
 
@@ -80,4 +100,9 @@ struct NodeDetailView: View {
             DebugLog.info("node detail load failed node=\(node.name) msg=\(msg)", category: "NodeDetail")
         }
     }
+}
+
+private struct NodeUserItem: Identifiable {
+    let value: String
+    var id: String { value }
 }

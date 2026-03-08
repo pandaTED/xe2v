@@ -36,4 +36,16 @@ final class NotificationsViewModel {
         guard let match = regex.firstMatch(in: payload, range: range), match.numberOfRanges > 1 else { return nil }
         return Int(ns.substring(with: match.range(at: 1)))
     }
+
+    func displayText(for item: V2EXNotification) -> String {
+        let base = item.text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !base.isEmpty { return base }
+
+        if let payload = item.payload, !payload.isEmpty {
+            return payload
+                .replacingOccurrences(of: "<[^>]+>", with: "", options: .regularExpression)
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        return "通知内容暂不可用"
+    }
 }

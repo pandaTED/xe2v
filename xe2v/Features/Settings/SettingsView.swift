@@ -6,14 +6,6 @@ struct SettingsView: View {
 
     var body: some View {
         List {
-            Section("产品原则") {
-                Label("无广告、无推荐算法、无营销推送", systemImage: "shield")
-                    .font(.body)
-                Text("默认不接入统计 SDK。仅支持本地调试日志开关。")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            }
-
             Section("阅读") {
                 HStack {
                     Text("字体大小")

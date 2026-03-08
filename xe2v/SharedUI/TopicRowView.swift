@@ -4,6 +4,7 @@ struct TopicRowView: View {
     let topic: V2EXTopic
     let isRead: Bool
     let fontScale: Double
+    var onTapUser: (() -> Void)?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -29,9 +30,16 @@ struct TopicRowView: View {
                     .foregroundStyle(.secondary)
                 Text("·")
                     .foregroundStyle(.tertiary)
-                Text(topic.member.username)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                if let onTapUser {
+                    Button(topic.member.username) { onTapUser() }
+                        .buttonStyle(.plain)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else {
+                    Text(topic.member.username)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
                 Spacer()
                 Text(topic.createdAt.relativeCN)
                     .font(.caption2)

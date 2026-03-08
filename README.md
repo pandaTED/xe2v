@@ -50,3 +50,12 @@
 示例测试文件：`/Users/zhuyunpeng/app_test/xe2v/xe2vTests/FormParserTests.swift`
 
 > 当前工程默认仅包含 App Target。若需要在 CI 执行测试，请在 Xcode 中添加 `xe2vTests` Test Target，并将该文件加入目标。
+
+## 本地调试日志（DEBUG）
+1. 打开 App -> 设置 -> 打开“本地调试日志”
+2. 在 Xcode Console 查看 `[DEBUG]` 前缀日志
+3. 已覆盖链路：
+   - HTTP 请求 URL / 状态码 / 缓存命中
+   - 首页、节点、通知加载成功条数与失败原因
+   - API 失败后是否触发网页登录回退
+   - 网页登录 Cookie 捕获数量

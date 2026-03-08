@@ -48,6 +48,7 @@ final class HomeViewModel {
             state = .loading
             page = 1
         }
+        DebugLog.info("home vm load start feed=\(feedType.rawValue) page=\(page) reset=\(reset)", category: "HomeVM")
 
         do {
             let list = try await repository.refreshHome(feed: feedType, page: page, pageSize: 20)
@@ -66,9 +67,11 @@ final class HomeViewModel {
             if feedType == .latest {
                 page += 1
             }
+            DebugLog.info("home vm load success count=\(topics.count) nextPage=\(page)", category: "HomeVM")
         } catch {
             let message = (error as? AppError)?.localizedDescription ?? error.localizedDescription
             state = .failed(message: message)
+            DebugLog.info("home vm load failed \(message)", category: "HomeVM")
         }
     }
 }

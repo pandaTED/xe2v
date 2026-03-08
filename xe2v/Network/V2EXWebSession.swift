@@ -25,22 +25,27 @@ final class V2EXWebSession: ObservableObject, V2EXWebSessionProtocol {
         do {
             let cookies = try cookieStore.restore()
             cookies.forEach { HTTPCookieStorage.shared.setCookie($0) }
+            DebugLog.info("restore session cookies=\(cookies.count)", category: "WebSession")
 
             if cookies.contains(where: { $0.name.lowercased().contains("a2") || $0.name.lowercased().contains("v2ex") }) {
                 let username = try? keychain.read(service: "com.cleanv2ex.auth", account: "username")
                     .flatMap { String(data: $0, encoding: .utf8) }
                 sessionState = .fullAccess(username: username ?? "已登录用户")
+                DebugLog.info("restore session success username=\(username ?? "已登录用户")", category: "WebSession")
             } else {
                 sessionState = .unauthenticated
+                DebugLog.info("restore session unauthenticated", category: "WebSession")
             }
         } catch {
             sessionState = .unauthenticated
+            DebugLog.info("restore session failed \(error.localizedDescription)", category: "WebSession")
         }
     }
 
     func bridgeCookies(_ cookies: [HTTPCookie], username: String?) async throws {
         guard !cookies.isEmpty else { throw AppError.invalidInput("未获取到 Cookie") }
         sessionState = .webAuthenticating
+        DebugLog.info("bridge cookies count=\(cookies.count)", category: "WebSession")
 
         cookies.forEach { HTTPCookieStorage.shared.setCookie($0) }
         try cookieStore.save(cookies: cookies)
@@ -48,6 +53,7 @@ final class V2EXWebSession: ObservableObject, V2EXWebSessionProtocol {
             try keychain.save(data: Data(username.utf8), service: "com.cleanv2ex.auth", account: "username")
         }
         sessionState = .fullAccess(username: username ?? "已登录用户")
+        DebugLog.info("bridge cookies success username=\(username ?? "已登录用户")", category: "WebSession")
     }
 
     func logout() async {
@@ -70,18 +76,24 @@ final class V2EXWebSession: ObservableObject, V2EXWebSessionProtocol {
         }
         let url = try makeURL(path: path)
         let html = try await fetchHTML(url: url)
-        return TopicListHTMLParser.parseTopics(html: html)
+        let list = TopicListHTMLParser.parseTopics(html: html)
+        DebugLog.info("web home parsed feed=\(feed.rawValue) page=\(page) count=\(list.count)", category: "WebSession")
+        return list
     }
 
     func fetchNodesViaWeb() async throws -> [V2EXNode] {
         let html = try await fetchHTML(url: try makeURL(path: "planes"))
-        return TopicListHTMLParser.parseNodes(html: html)
+        let list = TopicListHTMLParser.parseNodes(html: html)
+        DebugLog.info("web nodes parsed count=\(list.count)", category: "WebSession")
+        return list
     }
 
     func fetchTopicsViaWeb(nodeName: String, page: Int) async throws -> [V2EXTopic] {
         let path = page <= 1 ? "go/\(nodeName)" : "go/\(nodeName)?p=\(page)"
         let html = try await fetchHTML(url: try makeURL(path: path))
-        return TopicListHTMLParser.parseTopics(html: html)
+        let list = TopicListHTMLParser.parseTopics(html: html)
+        DebugLog.info("web node topics parsed node=\(nodeName) page=\(page) count=\(list.count)", category: "WebSession")
+        return list
     }
 
     func fetchNotificationsViaWeb() async throws -> [V2EXNotification] {
@@ -92,7 +104,9 @@ final class V2EXWebSession: ObservableObject, V2EXWebSessionProtocol {
             throw AppError.unauthorized
         }
 
-        return NotificationsHTMLParser.parse(html: html)
+        let list = NotificationsHTMLParser.parse(html: html)
+        DebugLog.info("web notifications parsed count=\(list.count)", category: "WebSession")
+        return list
     }
 
     func fetchReplyFormToken(topicID: Int) async throws -> FormToken {

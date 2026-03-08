@@ -15,12 +15,15 @@ final class NotificationsViewModel {
 
     func load() async {
         state = .loading
+        DebugLog.info("notifications vm load start", category: "NotifyVM")
         do {
             notifications = try await repository.notifications()
             state = notifications.isEmpty ? .empty(message: "暂无提醒") : .loaded
+            DebugLog.info("notifications vm load success count=\(notifications.count)", category: "NotifyVM")
         } catch {
             let msg = (error as? AppError)?.localizedDescription ?? error.localizedDescription
             state = .failed(message: msg)
+            DebugLog.info("notifications vm load failed \(msg)", category: "NotifyVM")
         }
     }
 

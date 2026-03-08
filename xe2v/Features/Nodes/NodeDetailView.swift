@@ -63,6 +63,7 @@ struct NodeDetailView: View {
             state = .loading
             page = 1
         }
+        DebugLog.info("node detail load start node=\(node.name) page=\(page) reset=\(reset)", category: "NodeDetail")
         do {
             let list = try await env.repository.topics(nodeName: node.name, page: page, pageSize: 20)
             if reset {
@@ -72,9 +73,11 @@ struct NodeDetailView: View {
             }
             state = topics.isEmpty ? .empty(message: "该节点暂无主题") : .loaded
             page += 1
+            DebugLog.info("node detail load success node=\(node.name) total=\(topics.count) nextPage=\(page)", category: "NodeDetail")
         } catch {
             let msg = (error as? AppError)?.localizedDescription ?? error.localizedDescription
             state = .failed(message: msg)
+            DebugLog.info("node detail load failed node=\(node.name) msg=\(msg)", category: "NodeDetail")
         }
     }
 }

@@ -12,16 +12,25 @@ final class V2EXRepository: V2EXRepositoryProtocol {
 
     func refreshHome(feed: TopicFeedType, page: Int, pageSize: Int) async throws -> [V2EXTopic] {
         do {
+            DebugLog.info("home load via API feed=\(feed.rawValue) page=\(page)", category: "Repo")
             switch feed {
             case .hot:
-                return try await readAPI.fetchHotTopics()
+                let list = try await readAPI.fetchHotTopics()
+                DebugLog.info("home API result count=\(list.count)", category: "Repo")
+                return list
             case .latest:
-                return try await readAPI.fetchLatestTopics(page: page, pageSize: pageSize)
+                let list = try await readAPI.fetchLatestTopics(page: page, pageSize: pageSize)
+                DebugLog.info("home API result count=\(list.count)", category: "Repo")
+                return list
             }
         } catch {
             if case .fullAccess = webSession.sessionState {
-                return try await webSession.fetchHomeTopicsViaWeb(feed: feed, page: page)
+                DebugLog.info("home API failed, fallback WEB feed=\(feed.rawValue) page=\(page), error=\(error.localizedDescription)", category: "Repo")
+                let list = try await webSession.fetchHomeTopicsViaWeb(feed: feed, page: page)
+                DebugLog.info("home WEB result count=\(list.count)", category: "Repo")
+                return list
             }
+            DebugLog.info("home load failed no fallback, error=\(error.localizedDescription)", category: "Repo")
             throw error
         }
     }
@@ -34,33 +43,54 @@ final class V2EXRepository: V2EXRepositoryProtocol {
 
     func nodes() async throws -> [V2EXNode] {
         do {
-            return try await readAPI.fetchNodes()
+            DebugLog.info("nodes load via API", category: "Repo")
+            let nodes = try await readAPI.fetchNodes()
+            DebugLog.info("nodes API result count=\(nodes.count)", category: "Repo")
+            return nodes
         } catch {
             if case .fullAccess = webSession.sessionState {
-                return try await webSession.fetchNodesViaWeb()
+                DebugLog.info("nodes API failed, fallback WEB, error=\(error.localizedDescription)", category: "Repo")
+                let nodes = try await webSession.fetchNodesViaWeb()
+                DebugLog.info("nodes WEB result count=\(nodes.count)", category: "Repo")
+                return nodes
             }
+            DebugLog.info("nodes load failed no fallback, error=\(error.localizedDescription)", category: "Repo")
             throw error
         }
     }
 
     func topics(nodeName: String, page: Int, pageSize: Int) async throws -> [V2EXTopic] {
         do {
-            return try await readAPI.fetchTopics(nodeName: nodeName, page: page, pageSize: pageSize)
+            DebugLog.info("node topics via API node=\(nodeName) page=\(page)", category: "Repo")
+            let topics = try await readAPI.fetchTopics(nodeName: nodeName, page: page, pageSize: pageSize)
+            DebugLog.info("node topics API result count=\(topics.count)", category: "Repo")
+            return topics
         } catch {
             if case .fullAccess = webSession.sessionState {
-                return try await webSession.fetchTopicsViaWeb(nodeName: nodeName, page: page)
+                DebugLog.info("node topics API failed, fallback WEB node=\(nodeName) page=\(page), error=\(error.localizedDescription)", category: "Repo")
+                let topics = try await webSession.fetchTopicsViaWeb(nodeName: nodeName, page: page)
+                DebugLog.info("node topics WEB result count=\(topics.count)", category: "Repo")
+                return topics
             }
+            DebugLog.info("node topics failed no fallback, node=\(nodeName), error=\(error.localizedDescription)", category: "Repo")
             throw error
         }
     }
 
     func notifications() async throws -> [V2EXNotification] {
         do {
-            return try await readAPI.fetchNotifications()
+            DebugLog.info("notifications via API", category: "Repo")
+            let list = try await readAPI.fetchNotifications()
+            DebugLog.info("notifications API result count=\(list.count)", category: "Repo")
+            return list
         } catch {
             if case .fullAccess = webSession.sessionState {
-                return try await webSession.fetchNotificationsViaWeb()
+                DebugLog.info("notifications API failed, fallback WEB, error=\(error.localizedDescription)", category: "Repo")
+                let list = try await webSession.fetchNotificationsViaWeb()
+                DebugLog.info("notifications WEB result count=\(list.count)", category: "Repo")
+                return list
             }
+            DebugLog.info("notifications failed no fallback, error=\(error.localizedDescription)", category: "Repo")
             throw error
         }
     }

@@ -45,6 +45,7 @@ final class TopicDetailViewModel {
             state = .loading
             replyPage = 1
         }
+        DebugLog.info("topic detail load start id=\(topicID) page=\(replyPage) reset=\(reset)", category: "TopicVM")
         do {
             let bundle = try await repository.topicDetail(id: topicID, replyPage: replyPage, replyPageSize: 30)
             topic = bundle.topic
@@ -55,9 +56,11 @@ final class TopicDetailViewModel {
             }
             state = .loaded
             replyPage += 1
+            DebugLog.info("topic detail load success id=\(topicID) replies=\(replies.count) nextPage=\(replyPage)", category: "TopicVM")
         } catch {
             let msg = (error as? AppError)?.localizedDescription ?? error.localizedDescription
             state = .failed(message: msg)
+            DebugLog.info("topic detail load failed id=\(topicID) msg=\(msg)", category: "TopicVM")
         }
     }
 }

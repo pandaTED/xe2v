@@ -31,9 +31,11 @@ struct WebLoginBridgeView: UIViewRepresentable {
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
             let host = webView.url?.host ?? ""
             guard host.contains("v2ex.com") else { return }
+            DebugLog.info("web login finished url=\(webView.url?.absoluteString ?? "nil")", category: "LoginWeb")
 
             webView.configuration.websiteDataStore.httpCookieStore.getAllCookies { cookies in
                 let valid = cookies.filter { $0.domain.contains("v2ex.com") }
+                DebugLog.info("web login cookies captured total=\(cookies.count) valid=\(valid.count)", category: "LoginWeb")
                 self.onCookiesCaptured(valid)
             }
         }

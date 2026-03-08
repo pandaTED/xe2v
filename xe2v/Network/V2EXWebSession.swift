@@ -89,10 +89,11 @@ final class V2EXWebSession: ObservableObject, V2EXWebSessionProtocol {
     }
 
     func fetchTopicsViaWeb(nodeName: String, page: Int) async throws -> [V2EXTopic] {
-        let path = page <= 1 ? "go/\(nodeName)" : "go/\(nodeName)?p=\(page)"
+        let normalizedPage = max(1, page)
+        let path = "go/\(nodeName)?p=\(normalizedPage)"
         let html = try await fetchHTML(url: try makeURL(path: path))
         let list = TopicListHTMLParser.parseTopics(html: html)
-        DebugLog.info("web node topics parsed node=\(nodeName) page=\(page) count=\(list.count)", category: "WebSession")
+        DebugLog.info("web node topics parsed path=\(path) count=\(list.count)", category: "WebSession")
         return list
     }
 

@@ -72,25 +72,27 @@ final class V2EXRepository: V2EXRepositoryProtocol {
     }
 
     func topics(nodeName: String, page: Int, pageSize: Int) async throws -> [V2EXTopic] {
+        // 节点分页统一按网页规则 /go/{node}?p={page}
         do {
-            DebugLog.info("node topics via API node=\(nodeName) page=\(page)", category: "Repo")
-            let topics = try await readAPI.fetchTopics(nodeName: nodeName, page: page, pageSize: pageSize)
-            DebugLog.info("node topics API result count=\(topics.count)", category: "Repo")
-            if topics.isEmpty {
-                let fallback = try await webSession.fetchTopicsViaWeb(nodeName: nodeName, page: page)
-                await memberCache.save(members: fallback.map(\.member))
-                DebugLog.info("node topics API empty, fallback WEB count=\(fallback.count)", category: "Repo")
-                return fallback
-            } else {
-                await memberCache.save(members: topics.map(\.member))
-                return topics
-            }
-        } catch {
-            DebugLog.info("node topics API failed, fallback WEB node=\(nodeName) page=\(page), error=\(error.localizedDescription)", category: "Repo")
+            DebugLog.info("node topics via WEB node=\(nodeName) page=\(page)", category: "Repo")
             let topics = try await webSession.fetchTopicsViaWeb(nodeName: nodeName, page: page)
             await memberCache.save(members: topics.map(\.member))
             DebugLog.info("node topics WEB result count=\(topics.count)", category: "Repo")
+
+            if page == 1, topics.isEmpty {
+                DebugLog.info("node topics WEB empty on first page, fallback API node=\(nodeName)", category: "Repo")
+                let apiTopics = try await readAPI.fetchTopics(nodeName: nodeName, page: page, pageSize: pageSize)
+                await memberCache.save(members: apiTopics.map(\.member))
+                DebugLog.info("node topics API fallback result count=\(apiTopics.count)", category: "Repo")
+                return apiTopics
+            }
             return topics
+        } catch {
+            DebugLog.info("node topics WEB failed, fallback API node=\(nodeName) page=\(page), error=\(error.localizedDescription)", category: "Repo")
+            let apiTopics = try await readAPI.fetchTopics(nodeName: nodeName, page: page, pageSize: pageSize)
+            await memberCache.save(members: apiTopics.map(\.member))
+            DebugLog.info("node topics API fallback result count=\(apiTopics.count)", category: "Repo")
+            return apiTopics
         }
     }
 

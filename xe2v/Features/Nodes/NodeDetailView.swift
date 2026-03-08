@@ -8,24 +8,39 @@ struct NodeDetailView: View {
     @State private var topics: [V2EXTopic] = []
     @State private var state: LoadState = .idle
     @State private var page = 1
+    @State private var hasMore = true
     @State private var loadingMore = false
     @State private var selectedUsername: String?
 
     var body: some View {
         Group {
             if case .loaded = state {
-                List(topics) { topic in
-                    TopicRowView(topic: topic,
-                                 isRead: env.readHistory.isRead(topic.id),
-                                 fontScale: env.settings.fontScale,
-                                 onTapUser: { selectedUsername = topic.member.username })
-                        .onTapGesture {
-                            env.readHistory.markRead(topicID: topic.id)
-                            selectedTopic = topic
+                List {
+                    ForEach(topics) { topic in
+                        TopicRowView(topic: topic,
+                                     isRead: env.readHistory.isRead(topic.id),
+                                     fontScale: env.settings.fontScale,
+                                     onTapUser: { selectedUsername = topic.member.username })
+                            .onTapGesture {
+                                env.readHistory.markRead(topicID: topic.id)
+                                selectedTopic = topic
+                            }
+                            .onAppear {
+                                loadMoreIfNeeded(topic)
+                            }
+                    }
+
+                    if hasMore, let last = topics.last {
+                        HStack {
+                            Spacer()
+                            ProgressView()
+                            Spacer()
                         }
                         .onAppear {
-                            loadMoreIfNeeded(topic)
+                            loadMoreIfNeeded(last)
                         }
+                        .listRowSeparator(.hidden)
+                    }
                 }
                 .listStyle(.plain)
             } else {
@@ -50,11 +65,6 @@ struct NodeDetailView: View {
                 await load(reset: true)
             }
         }
-        .onAppear {
-            if state == .idle {
-                Task { await load(reset: true) }
-            }
-        }
         .refreshable {
             await load(reset: true)
         }
@@ -69,6 +79,7 @@ struct NodeDetailView: View {
     }
 
     private func loadMoreIfNeeded(_ topic: V2EXTopic) {
+        guard hasMore else { return }
         guard let last = topics.last, last.id == topic.id else { return }
         guard !loadingMore else { return }
         loadingMore = true
@@ -82,6 +93,7 @@ struct NodeDetailView: View {
         if reset {
             state = .loading
             page = 1
+            hasMore = true
         }
         DebugLog.info("node detail load start node=\(node.name) page=\(page) reset=\(reset)", category: "NodeDetail")
         do {
@@ -89,11 +101,25 @@ struct NodeDetailView: View {
             if reset {
                 topics = list
             } else {
-                topics.append(contentsOf: list)
+                let existing = Set(topics.map(\.id))
+                let deduped = list.filter { !existing.contains($0.id) }
+                topics.append(contentsOf: deduped)
+                if deduped.isEmpty {
+                    hasMore = false
+                }
             }
+
+            if list.isEmpty {
+                hasMore = false
+            }
+
             state = topics.isEmpty ? .empty(message: "该节点暂无主题") : .loaded
-            page += 1
-            DebugLog.info("node detail load success node=\(node.name) total=\(topics.count) nextPage=\(page)", category: "NodeDetail")
+            if hasMore {
+                page += 1
+            }
+            DebugLog.info("node detail load success node=\(node.name) total=\(topics.count) nextPage=\(page) hasMore=\(hasMore)", category: "NodeDetail")
+        } catch is CancellationError {
+            DebugLog.info("node detail load cancelled node=\(node.name)", category: "NodeDetail")
         } catch {
             let msg = (error as? AppError)?.localizedDescription ?? error.localizedDescription
             state = .failed(message: msg)

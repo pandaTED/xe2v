@@ -13,36 +13,35 @@ final class HomeViewModel {
     var page: Int = 1
     var hasMore = true
     var isLoadingMore = false
-
-    private var loadTask: Task<Void, Never>?
+    private var isRefreshing = false
 
     init(repository: V2EXRepositoryProtocol) {
         self.repository = repository
     }
 
-    func refresh() {
-        loadTask?.cancel()
-        loadTask = Task { [weak self] in
-            guard let self else { return }
-            await load(reset: true)
-        }
+    func refresh() async {
+        guard !isRefreshing else { return }
+        isRefreshing = true
+        defer { isRefreshing = false }
+        await load(reset: true)
     }
 
     func switchFeed(_ feed: TopicFeedType) {
         guard feed != feedType else { return }
         feedType = feed
         selectedQuickNodeName = nil
-        refresh()
+        Task { await refresh() }
     }
 
     func switchQuickNode(_ nodeName: String?) {
         guard selectedQuickNodeName != nodeName else { return }
         selectedQuickNodeName = nodeName
-        refresh()
+        Task { await refresh() }
     }
 
     func loadMoreIfNeeded(current topic: V2EXTopic) {
         guard hasMore else { return }
+        guard !isRefreshing else { return }
         let canPage = selectedQuickNodeName != nil || feedType == .latest
         guard canPage, let last = topics.last, last.id == topic.id else { return }
         guard !isLoadingMore else { return }

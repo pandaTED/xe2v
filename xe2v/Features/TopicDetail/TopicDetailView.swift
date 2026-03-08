@@ -22,7 +22,7 @@ struct TopicDetailView: View {
                 contentView
             } else {
                 StateView(state: viewModel.state) {
-                    viewModel.load(reset: true)
+                    Task { await viewModel.load(reset: true) }
                 }
             }
         }
@@ -41,7 +41,7 @@ struct TopicDetailView: View {
         }
         .sheet(isPresented: $showReplyComposer) {
             ReplyComposerView(env: env, topicID: topicID, quoteFloor: viewModel.quoteFloor) {
-                viewModel.load(reset: true)
+                Task { await viewModel.load(reset: true) }
             }
         }
         .sheet(item: Binding(
@@ -54,7 +54,7 @@ struct TopicDetailView: View {
         }
         .task {
             if viewModel.state == .idle {
-                viewModel.load(reset: true)
+                await viewModel.load(reset: true)
             }
         }
     }
@@ -122,7 +122,7 @@ struct TopicDetailView: View {
             }
             .listStyle(.insetGrouped)
             .refreshable {
-                viewModel.load(reset: true)
+                await viewModel.load(reset: true)
             }
             .overlay(alignment: .bottomTrailing) {
                 if showBackToTop {

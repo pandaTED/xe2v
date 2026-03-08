@@ -13,29 +13,32 @@ final class TopicDetailViewModel {
     var replyPage = 1
     var isLoadingMore = false
     var quoteFloor: Int?
-
-    private var loadTask: Task<Void, Never>?
+    private var isRefreshing = false
 
     init(repository: V2EXRepositoryProtocol, topicID: Int) {
         self.repository = repository
         self.topicID = topicID
     }
 
-    func load(reset: Bool) {
-        loadTask?.cancel()
-        loadTask = Task { [weak self] in
-            guard let self else { return }
-            await fetch(reset: reset)
+    func load(reset: Bool) async {
+        if reset {
+            guard !isRefreshing else { return }
+            isRefreshing = true
+            await fetch(reset: true)
+            isRefreshing = false
+            return
         }
+        await fetch(reset: false)
     }
 
     func loadMoreIfNeeded(lastVisible reply: V2EXReply) {
         guard let last = replies.last, last.id == reply.id else { return }
+        guard !isRefreshing else { return }
         guard !isLoadingMore else { return }
         isLoadingMore = true
         Task { [weak self] in
             guard let self else { return }
-            await fetch(reset: false)
+            await load(reset: false)
             self.isLoadingMore = false
         }
     }

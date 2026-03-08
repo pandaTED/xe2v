@@ -16,11 +16,15 @@ struct HomeView: View {
     var body: some View {
         Group {
             if case .loaded = viewModel.state, viewModel.topics.isEmpty {
-                StateView(state: .empty(message: "暂无主题"), retry: viewModel.refresh)
+                StateView(state: .empty(message: "暂无主题"), retry: {
+                    Task { await viewModel.refresh() }
+                })
             } else if case .loaded = viewModel.state {
                 listView
             } else {
-                StateView(state: viewModel.state, retry: viewModel.refresh)
+                StateView(state: viewModel.state, retry: {
+                    Task { await viewModel.refresh() }
+                })
             }
         }
         .navigationTitle("V2EX")
@@ -40,12 +44,12 @@ struct HomeView: View {
         }
         .task {
             if viewModel.state == .idle {
-                viewModel.refresh()
+                await viewModel.refresh()
             }
         }
         .onAppear {
             if viewModel.state == .idle {
-                viewModel.refresh()
+                Task { await viewModel.refresh() }
             }
         }
         .sheet(item: Binding(
@@ -103,7 +107,7 @@ struct HomeView: View {
         }
         .listStyle(.plain)
         .refreshable {
-            viewModel.refresh()
+            await viewModel.refresh()
         }
     }
 

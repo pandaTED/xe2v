@@ -13,6 +13,7 @@ final class HomeViewModel {
     var page: Int = 1
     var hasMore = true
     var isLoadingMore = false
+    var paginationErrorMessage: String?
     private var isRefreshing = false
 
     init(repository: V2EXRepositoryProtocol) {
@@ -39,12 +40,13 @@ final class HomeViewModel {
         Task { await refresh() }
     }
 
-    func loadMoreIfNeeded(current topic: V2EXTopic) {
+    func loadMoreIfNeeded(currentIndex: Int) {
         guard hasMore else { return }
         guard !isRefreshing else { return }
-        let canPage = selectedQuickNodeName != nil || feedType == .latest
-        guard canPage, let last = topics.last, last.id == topic.id else { return }
         guard !isLoadingMore else { return }
+        guard !topics.isEmpty else { return }
+        let threshold = max(topics.count - 4, 0)
+        guard currentIndex >= threshold else { return }
         isLoadingMore = true
         Task { [weak self] in
             guard let self else { return }
@@ -53,11 +55,21 @@ final class HomeViewModel {
         }
     }
 
+    func retryLoadMore() async {
+        guard hasMore else { return }
+        guard !isRefreshing else { return }
+        guard !isLoadingMore else { return }
+        isLoadingMore = true
+        await load(reset: false)
+        isLoadingMore = false
+    }
+
     private func load(reset: Bool) async {
         if reset {
             state = .loading
             page = 1
             hasMore = true
+            paginationErrorMessage = nil
         }
         DebugLog.info("home vm load start feed=\(feedType.rawValue) page=\(page) reset=\(reset)", category: "HomeVM")
 
@@ -76,6 +88,7 @@ final class HomeViewModel {
                 topics = list
             } else {
                 topics.append(contentsOf: deduped)
+                paginationErrorMessage = nil
             }
 
             if topics.isEmpty {
@@ -84,25 +97,26 @@ final class HomeViewModel {
                 state = .loaded
             }
 
-            let canPage = selectedQuickNodeName != nil || feedType == .latest
-            if canPage {
-                if list.isEmpty || (!reset && deduped.isEmpty) {
-                    hasMore = false
-                } else {
-                    page += 1
-                }
-            } else {
+            if list.isEmpty || (!reset && deduped.isEmpty) {
                 hasMore = false
+            } else {
+                page += 1
             }
-
-            if !canPage || !hasMore {
-                DebugLog.info("home vm paging stopped canPage=\(canPage) hasMore=\(hasMore)", category: "HomeVM")
+            if !hasMore {
+                DebugLog.info("home vm paging stopped hasMore=false", category: "HomeVM")
             }
             DebugLog.info("home vm load success count=\(topics.count) nextPage=\(page)", category: "HomeVM")
+        } catch is CancellationError {
+            DebugLog.info("home vm load cancelled", category: "HomeVM")
         } catch {
             let message = (error as? AppError)?.localizedDescription ?? error.localizedDescription
-            state = .failed(message: message)
-            DebugLog.info("home vm load failed \(message)", category: "HomeVM")
+            if reset {
+                state = .failed(message: message)
+            } else {
+                paginationErrorMessage = message
+                state = topics.isEmpty ? .failed(message: message) : .loaded
+            }
+            DebugLog.info("home vm load failed reset=\(reset) msg=\(message)", category: "HomeVM")
         }
     }
 }

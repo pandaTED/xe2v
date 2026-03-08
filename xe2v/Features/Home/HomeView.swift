@@ -78,7 +78,7 @@ struct HomeView: View {
                 }
             }
 
-            ForEach(viewModel.topics) { topic in
+            ForEach(Array(viewModel.topics.enumerated()), id: \.element.id) { index, topic in
                 TopicRowView(topic: topic,
                              isRead: env.readHistory.isRead(topic.id),
                              fontScale: env.settings.fontScale,
@@ -88,20 +88,38 @@ struct HomeView: View {
                         selectedTopic = topic
                     }
                     .onAppear {
-                        viewModel.loadMoreIfNeeded(current: topic)
+                        viewModel.loadMoreIfNeeded(currentIndex: index)
                     }
                     .listRowSeparator(.visible)
             }
 
-            if viewModel.hasMore, let last = viewModel.topics.last {
+            if viewModel.isLoadingMore {
                 HStack {
                     Spacer()
                     ProgressView()
                     Spacer()
                 }
-                .onAppear {
-                    viewModel.loadMoreIfNeeded(current: last)
+                .listRowSeparator(.hidden)
+            } else if let message = viewModel.paginationErrorMessage {
+                VStack(spacing: 8) {
+                    Text(message)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                    Button("点击重试加载更多") {
+                        Task { await viewModel.retryLoadMore() }
+                    }
+                    .buttonStyle(.bordered)
                 }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 8)
+                .listRowSeparator(.hidden)
+            } else if viewModel.hasMore, !viewModel.topics.isEmpty {
+                Color.clear
+                    .frame(height: 1)
+                    .onAppear {
+                        viewModel.loadMoreIfNeeded(currentIndex: max(viewModel.topics.count - 1, 0))
+                    }
                 .listRowSeparator(.hidden)
             }
         }

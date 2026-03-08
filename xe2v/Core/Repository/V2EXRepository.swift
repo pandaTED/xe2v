@@ -14,9 +14,23 @@ final class V2EXRepository: V2EXRepositoryProtocol {
 
     func refreshHome(feed: TopicFeedType, page: Int, pageSize: Int) async throws -> [V2EXTopic] {
         if feed == .latest, page > 1 {
-            let list = try await webSession.fetchHomeTopicsViaWeb(feed: feed, page: page)
-            await memberCache.save(members: list.map(\.member))
-            return list
+            do {
+                let webList = try await webSession.fetchHomeTopicsViaWeb(feed: feed, page: page)
+                if !webList.isEmpty {
+                    await memberCache.save(members: webList.map(\.member))
+                    return webList
+                }
+
+                DebugLog.info("home WEB empty on page=\(page), fallback API", category: "Repo")
+                let apiList = try await readAPI.fetchLatestTopics(page: page, pageSize: pageSize)
+                await memberCache.save(members: apiList.map(\.member))
+                return apiList
+            } catch {
+                DebugLog.info("home WEB page=\(page) failed, fallback API, error=\(error.localizedDescription)", category: "Repo")
+                let apiList = try await readAPI.fetchLatestTopics(page: page, pageSize: pageSize)
+                await memberCache.save(members: apiList.map(\.member))
+                return apiList
+            }
         }
 
         do {

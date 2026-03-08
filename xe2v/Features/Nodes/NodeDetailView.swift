@@ -10,13 +10,14 @@ struct NodeDetailView: View {
     @State private var page = 1
     @State private var hasMore = true
     @State private var loadingMore = false
+    @State private var paginationErrorMessage: String?
     @State private var selectedUsername: String?
 
     var body: some View {
         Group {
             if case .loaded = state {
                 List {
-                    ForEach(topics) { topic in
+                    ForEach(Array(topics.enumerated()), id: \.element.id) { index, topic in
                         TopicRowView(topic: topic,
                                      isRead: env.readHistory.isRead(topic.id),
                                      fontScale: env.settings.fontScale,
@@ -26,19 +27,37 @@ struct NodeDetailView: View {
                                 selectedTopic = topic
                             }
                             .onAppear {
-                                loadMoreIfNeeded(topic)
+                                loadMoreIfNeeded(index: index)
                             }
                     }
 
-                    if hasMore, let last = topics.last {
+                    if loadingMore {
                         HStack {
                             Spacer()
                             ProgressView()
                             Spacer()
                         }
-                        .onAppear {
-                            loadMoreIfNeeded(last)
+                        .listRowSeparator(.hidden)
+                    } else if let message = paginationErrorMessage {
+                        VStack(spacing: 8) {
+                            Text(message)
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                                .multilineTextAlignment(.center)
+                            Button("点击重试加载更多") {
+                                Task { await retryLoadMore() }
+                            }
+                            .buttonStyle(.bordered)
                         }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 8)
+                        .listRowSeparator(.hidden)
+                    } else if hasMore, !topics.isEmpty {
+                        Color.clear
+                            .frame(height: 1)
+                            .onAppear {
+                                loadMoreIfNeeded(index: max(topics.count - 1, 0))
+                            }
                         .listRowSeparator(.hidden)
                     }
                 }
@@ -78,10 +97,12 @@ struct NodeDetailView: View {
         }
     }
 
-    private func loadMoreIfNeeded(_ topic: V2EXTopic) {
+    private func loadMoreIfNeeded(index: Int) {
         guard hasMore else { return }
-        guard let last = topics.last, last.id == topic.id else { return }
         guard !loadingMore else { return }
+        guard !topics.isEmpty else { return }
+        let threshold = max(topics.count - 4, 0)
+        guard index >= threshold else { return }
         loadingMore = true
         Task {
             await load(reset: false)
@@ -89,11 +110,20 @@ struct NodeDetailView: View {
         }
     }
 
+    private func retryLoadMore() async {
+        guard hasMore else { return }
+        guard !loadingMore else { return }
+        loadingMore = true
+        await load(reset: false)
+        loadingMore = false
+    }
+
     private func load(reset: Bool) async {
         if reset {
             state = .loading
             page = 1
             hasMore = true
+            paginationErrorMessage = nil
         }
         DebugLog.info("node detail load start node=\(node.name) page=\(page) reset=\(reset)", category: "NodeDetail")
         do {
@@ -104,6 +134,7 @@ struct NodeDetailView: View {
                 let existing = Set(topics.map(\.id))
                 let deduped = list.filter { !existing.contains($0.id) }
                 topics.append(contentsOf: deduped)
+                paginationErrorMessage = nil
                 if deduped.isEmpty {
                     hasMore = false
                 }
@@ -122,7 +153,12 @@ struct NodeDetailView: View {
             DebugLog.info("node detail load cancelled node=\(node.name)", category: "NodeDetail")
         } catch {
             let msg = (error as? AppError)?.localizedDescription ?? error.localizedDescription
-            state = .failed(message: msg)
+            if reset {
+                state = .failed(message: msg)
+            } else {
+                paginationErrorMessage = msg
+                state = topics.isEmpty ? .failed(message: msg) : .loaded
+            }
             DebugLog.info("node detail load failed node=\(node.name) msg=\(msg)", category: "NodeDetail")
         }
     }

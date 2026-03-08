@@ -120,7 +120,9 @@ struct NodeDetailView: View {
 
     private func load(reset: Bool) async {
         if reset {
-            state = .loading
+            if topics.isEmpty {
+                state = .loading
+            }
             page = 1
             hasMore = true
             paginationErrorMessage = nil

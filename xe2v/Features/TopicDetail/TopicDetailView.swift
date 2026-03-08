@@ -101,7 +101,7 @@ struct TopicDetailView: View {
                             .buttonStyle(.bordered)
                         }
 
-                        ForEach(Array(viewModel.replies.enumerated()), id: \.element.id) { index, reply in
+                        ForEach(Array(viewModel.replies.enumerated()), id: \.offset) { index, reply in
                             ReplyRowView(reply: reply,
                                          floor: index + 1,
                                          fontScale: env.settings.fontScale,
@@ -113,9 +113,39 @@ struct TopicDetailView: View {
                                              showReplyComposer = true
                                          })
                             .onAppear {
-                                viewModel.loadMoreIfNeeded(lastVisible: reply)
+                                viewModel.loadMoreIfNeeded(currentIndex: index)
                                 showBackToTop = index > 6
                             }
+                        }
+
+                        if viewModel.isLoadingMore {
+                            HStack {
+                                Spacer()
+                                ProgressView()
+                                Spacer()
+                            }
+                            .listRowSeparator(.hidden)
+                        } else if let message = viewModel.paginationErrorMessage {
+                            VStack(spacing: 8) {
+                                Text(message)
+                                    .font(.footnote)
+                                    .foregroundStyle(.secondary)
+                                    .multilineTextAlignment(.center)
+                                Button("点击重试加载更多回复") {
+                                    Task { await viewModel.retryLoadMore() }
+                                }
+                                .buttonStyle(.bordered)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 8)
+                            .listRowSeparator(.hidden)
+                        } else if viewModel.hasMoreReplies, !viewModel.replies.isEmpty {
+                            Color.clear
+                                .frame(height: 1)
+                                .onAppear {
+                                    viewModel.loadMoreIfNeeded(currentIndex: max(viewModel.replies.count - 1, 0))
+                                }
+                                .listRowSeparator(.hidden)
                         }
                     }
                 }

@@ -23,30 +23,37 @@ struct ReplyComposerView: View {
 
     var body: some View {
         NavigationStack {
-            Form {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 12) {
                 if let floor = vm.quoteFloor {
-                    Section {
-                        HStack {
-                            Text("引用楼层")
-                            Spacer()
-                            Text("#\(floor)")
-                                .foregroundStyle(.secondary)
-                        }
+                    HStack {
+                        Text("引用楼层")
+                        Spacer()
+                        Text("#\(floor)")
+                            .foregroundStyle(.secondary)
                     }
+                    .padding(12)
+                    .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
                 }
 
-                Section("回复内容") {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("回复内容")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                     TextEditor(text: $vm.content)
                         .frame(minHeight: 200)
                         .font(.body)
+                        .padding(8)
+                        .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
                 }
 
                 if !env.webSession.sessionState.canWrite {
-                    Section {
-                        Label(AppError.unsupportedWriteMode.localizedDescription, systemImage: "exclamationmark.triangle")
-                            .foregroundStyle(.orange)
-                    }
+                    Label(AppError.unsupportedWriteMode.localizedDescription, systemImage: "exclamationmark.triangle")
+                        .foregroundStyle(.orange)
+                        .font(.footnote)
                 }
+                }
+                .padding()
             }
             .navigationTitle("写回复")
             .navigationBarTitleDisplayMode(.inline)

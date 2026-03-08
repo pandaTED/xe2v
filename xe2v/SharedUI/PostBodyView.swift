@@ -13,9 +13,7 @@ struct PostBodyView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(makeAttributed(markdownOrPlain))
-                .font(.body)
-                .textSelection(.enabled)
+            SelectableTextView(attributedText: NSAttributedString(makeAttributed(markdownOrPlain)))
 
             let imageURLs = collectImageURLs()
             if !imageURLs.isEmpty {

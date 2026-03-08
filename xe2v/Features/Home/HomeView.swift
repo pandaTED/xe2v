@@ -88,6 +88,18 @@ struct HomeView: View {
                     }
                     .listRowSeparator(.visible)
             }
+
+            if viewModel.hasMore, let last = viewModel.topics.last {
+                HStack {
+                    Spacer()
+                    ProgressView()
+                    Spacer()
+                }
+                .onAppear {
+                    viewModel.loadMoreIfNeeded(current: last)
+                }
+                .listRowSeparator(.hidden)
+            }
         }
         .listStyle(.plain)
         .refreshable {

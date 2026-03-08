@@ -62,9 +62,6 @@ struct NodeDetailView: View {
                                 bottomVisible = true
                                 loadMoreIfNeeded(index: max(topics.count - 1, 0))
                             }
-                            .onDisappear {
-                                bottomVisible = false
-                            }
                         .listRowSeparator(.hidden)
                     }
                 }
@@ -106,6 +103,11 @@ struct NodeDetailView: View {
             guard oldValue, !newValue else { return }
             guard bottomVisible, hasMore else { return }
             loadMoreIfNeeded(index: max(topics.count - 1, 0))
+        }
+        .onChange(of: hasMore) { _, newValue in
+            if !newValue {
+                bottomVisible = false
+            }
         }
     }
 
